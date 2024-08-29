@@ -1,3 +1,8 @@
+"""Main ROS2 node for the drone fencing demo. 
+
+Assumes we have a PX4 drone and an obstacle (sword tip) tracked by motion capture.
+"""
+
 from collections import deque
 from functools import partial
 
@@ -131,8 +136,21 @@ def safe_controller(cbf: CBF, z: Array, z_des: Array, z_obs: Array) -> Array:
 
 
 class CBFNode(Node):
+    """ROS2 node for the CBF drone controller
 
-    def __init__(self, cbf_config: CBFConfig):
+    Args:
+        cbf_config (CBFConfig): Configuration for the CBF safety filter
+        z_des (ArrayLike, optional): Desired state of the point-mass reduced model of the drone
+            (position + velocity), shape (6,). Defaults to (0, 0, -1, 0, 0, 0).
+        vel_buffer_depth (int, optional): Depth of the buffer for filtering the obstacle velocity.
+    """
+
+    def __init__(
+        self,
+        cbf_config: CBFConfig,
+        z_des: ArrayLike = (0, 0, -1, 0, 0, 0),
+        vel_buffer_depth: int = 5,
+    ):
         super().__init__(NODE_NAME)
         assert isinstance(cbf_config, CBFConfig)
         qos_profile = QoSProfile(
@@ -156,9 +174,9 @@ class CBFNode(Node):
         self.obstacle_mocap_sub = self.create_subscription(
             Pose, OBSTACLE_MOCAP_TOPIC, self.mocap_callback, qos_profile
         )
-        self.z_des = np.array([0.0, 0.0, -1.0, 0.0, 0.0, 0.0])  # TODO CHECK ON Z HEIGHT
+        self.z_des = jnp.asarray(z_des, dtype=jnp.float64)
         self.last_z = None
-        self.velocity_buffer = deque(maxlen=5)
+        self.velocity_buffer = deque(maxlen=vel_buffer_depth)
         self.last_obstacle_time = None
         self.last_obstacle_position = None
         self.last_z_obs = None
@@ -174,16 +192,24 @@ class CBFNode(Node):
         current_time = self.get_clock().now().to_msg()
         time_in_seconds = current_time.sec + current_time.nanosec * 1e-9
         current_position = np.array([msg.position.x, msg.position.y, msg.position.z])
-        if self.last_obstacle_time is not None and self.last_obstacle_time is not None:
+        if (
+            self.last_obstacle_position is not None
+            and self.last_obstacle_time is not None
+        ):
             delta_time = time_in_seconds - self.last_obstacle_time
             delta_position = current_position - self.last_obstacle_position
             instantaneous_velocity = delta_position / delta_time
             self.velocity_buffer.append(instantaneous_velocity)
         filtered_velocity = np.mean(self.velocity_buffer, axis=0)
+
+        # Update stored parameters
+        self.last_obstacle_time = time_in_seconds
+        self.last_obstacle_position = current_position
         self.last_z_obs = np.concatenate([current_position, filtered_velocity])
         self.publish_control()
 
     def publish_control(self):
+        """Publish the CBF safe velocity control input to the drone"""
         if self.last_z is None or self.last_z_obs is None:
             return
         msg = TrajectorySetpoint(
