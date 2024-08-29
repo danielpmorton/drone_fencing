@@ -37,6 +37,14 @@ class DroneConfig(CBFConfig):
     i.e. z = [x, y, z, vx, vy, vz]
     and z_dot = f(z) + g(z)u = [0, 0, 0, 0, 0, 0] + [vx, vy, vz, 0, 0, 0]
     where u  = [vx, vy, vz]
+
+    Args:
+        pos_min (ArrayLike, optional): XYZ Lower bound of the safe-set box. Defaults to (-2, -2, -2)
+        pos_max (ArrayLike, optional): XYZ Upper bound of the safe-set box. Defaults to (2, 2, 2)
+        drone_radius (float, optional): Radius of the drone. Defaults to 0.175.
+        obstacle_radius (float, optional): Radius of the obstacle. Defaults to 0.04.
+        padding (float, optional): Padding between the drone and the obstacle. Defaults to 0.15.
+        lookahead_time (float, optional): Time horizon for obstacle avoidance. Defaults to 2.0.
     """
 
     def __init__(
@@ -123,13 +131,15 @@ def safe_controller(cbf: CBF, z: Array, z_des: Array, z_obs: Array) -> Array:
     """CBF safe controller for the drone
 
     Args:
-        cbf (CBF): _description_
-        z (Array): _description_
-        z_des (Array): _description_
-        z_obs (Array): _description_
+        cbf (CBF): Control barrier function for the drone
+        z (Array): State of the point-mass reduced model of the drone
+            (position + velocity), shape (6,)
+        z_des (Array): Desired state of the point-mass reduced model of the drone
+            (position + velocity), shape (6,)
+        z_obs (Array): State of the obstacle (position + velocity), shape (6,)
 
     Returns:
-        Array: _description_
+        Array: Velocity control input, shape (3,)
     """
     u = nominal_controller(z, z_des)
     return cbf.safety_filter(z, u, z_obs)
@@ -153,18 +163,20 @@ class CBFNode(Node):
     ):
         super().__init__(NODE_NAME)
         assert isinstance(cbf_config, CBFConfig)
+        self.cbf = CBF.from_config(cbf_config)
+        self.z_des = jnp.asarray(z_des, dtype=jnp.float64)
+        # QoS profile for the publisher and subscribers
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
-        self.cbf = CBF.from_config(cbf_config)
-        # Publisher
+        # Publisher: Sends velocity control commands
         self.setpoint_pub = self.create_publisher(
             TrajectorySetpoint, VEHICLE_SETPOINT_TOPIC, qos_profile
         )
-        # Subscribers
+        # Subscribers: Listens to state of the drone and the obstacle
         self.vehicle_odometry_sub = self.create_subscription(
             VehicleOdometry,
             VEHICLE_ODOMETRY_TOPIC,
@@ -174,7 +186,8 @@ class CBFNode(Node):
         self.obstacle_mocap_sub = self.create_subscription(
             Pose, OBSTACLE_MOCAP_TOPIC, self.mocap_callback, qos_profile
         )
-        self.z_des = jnp.asarray(z_des, dtype=jnp.float64)
+        # Set up cache for last known states of the drone and the obstacle
+        # Also, store a buffer for filtering the obstacle velocity
         self.last_z = None
         self.velocity_buffer = deque(maxlen=vel_buffer_depth)
         self.last_obstacle_time = None
