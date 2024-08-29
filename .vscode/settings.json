@@ -1,15 +1,17 @@
 {
     "python.autoComplete.extraPaths": [
-        "/home/lowjunen/StanfordMSL/TrajBridge/TrajBridge/install/px4_msgs/local/lib/python3.10/dist-packages",
-        "/home/lowjunen/StanfordMSL/TrajBridge/TrajBridge/install/px4_msgs/lib/python3.8/site-packages",
+        "/home/dmorton/drone_fencing_ws/src/TrajBridge/TrajBridge/install/px4_msgs/local/lib/python3.10/dist-packages",
+        "/home/dmorton/drone_fencing_ws/src/TrajBridge/TrajBridge/install/px4_msgs/lib/python3.8/site-packages",
         "/opt/ros/humble/lib/python3.10/site-packages",
         "/opt/ros/humble/local/lib/python3.10/dist-packages"
     ],
     "python.analysis.extraPaths": [
-        "/home/lowjunen/StanfordMSL/TrajBridge/TrajBridge/install/px4_msgs/local/lib/python3.10/dist-packages",
-        "/home/lowjunen/StanfordMSL/TrajBridge/TrajBridge/install/px4_msgs/lib/python3.8/site-packages",
+        "/home/dmorton/drone_fencing_ws/src/TrajBridge/TrajBridge/install/px4_msgs/local/lib/python3.10/dist-packages",
+        "/home/dmorton/drone_fencing_ws/src/TrajBridge/TrajBridge/install/px4_msgs/lib/python3.8/site-packages",
         "/opt/ros/humble/lib/python3.10/site-packages",
         "/opt/ros/humble/local/lib/python3.10/dist-packages"
     ],
-    "ros.distro": "humble"
+    "ros.distro": "humble",
+    "editor.formatOnSave": true,
+    "editor.renderWhitespace": "all",
 }
