@@ -153,6 +153,7 @@ class CBFNode(Node):
         z_des (ArrayLike, optional): Desired state of the point-mass reduced model of the drone
             (position + velocity), shape (6,). Defaults to (0, 0, -1, 0, 0, 0).
         vel_buffer_depth (int, optional): Depth of the buffer for filtering the obstacle velocity.
+        control_freq (float, optional): Control frequency of the drone. Defaults to 200 Hz.
     """
 
     def __init__(
@@ -160,11 +161,13 @@ class CBFNode(Node):
         cbf_config: CBFConfig,
         z_des: ArrayLike = (0, 0, -1, 0, 0, 0),
         vel_buffer_depth: int = 5,
+        control_freq: float = 200,
     ):
         super().__init__(NODE_NAME)
         assert isinstance(cbf_config, CBFConfig)
         self.cbf = CBF.from_config(cbf_config)
         self.z_des = jnp.asarray(z_des, dtype=jnp.float64)
+        self.control_freq = control_freq
         # QoS profile for the publisher and subscribers
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -194,10 +197,13 @@ class CBFNode(Node):
         self.last_obstacle_position = None
         self.last_z_obs = None
 
+        # Publish the control input at the desired frequency
+        self.timer = self.create_timer(1 / self.control_freq, self.publish_control)
+
     def vehicle_odometry_callback(self, msg: VehicleOdometry):
         """Callback when we have new information on the state of the drone"""
         self.last_z = np.concatenate([msg.position, msg.velocity])
-        self.publish_control()
+        # self.publish_control()
 
     def mocap_callback(self, msg: Pose):
         """Callback when we have new information on the state of the obstacle"""
@@ -219,7 +225,7 @@ class CBFNode(Node):
         self.last_obstacle_time = time_in_seconds
         self.last_obstacle_position = current_position
         self.last_z_obs = np.concatenate([current_position, filtered_velocity])
-        self.publish_control()
+        # self.publish_control()
 
     def publish_control(self):
         """Publish the CBF safe velocity control input to the drone"""
