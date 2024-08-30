@@ -21,12 +21,10 @@ from px4_msgs.msg import TrajectorySetpoint, VehicleOdometry
 
 jax.config.update("jax_enable_x64", True)
 
-# TODO check on the exact topics and the types of each message
-
 NODE_NAME = "cbf_node"
 VEHICLE_ODOMETRY_TOPIC = "/fmu/out/vehicle_odometry"
 OBSTACLE_MOCAP_TOPIC = "/vrpn_mocap/obstacle/pose"
-VEHICLE_SETPOINT_TOPIC = "/fmu/in/vehicle_setpoint"
+VEHICLE_SETPOINT_TOPIC = "/fmu/setpoint_control/velocity_with_ff"
 
 
 class DroneConfig(CBFConfig):
@@ -153,7 +151,7 @@ class CBFNode(Node):
         z_des (ArrayLike, optional): Desired state of the point-mass reduced model of the drone
             (position + velocity), shape (6,). Defaults to (0, 0, -1, 0, 0, 0).
         vel_buffer_depth (int, optional): Depth of the buffer for filtering the obstacle velocity.
-        control_freq (float, optional): Control frequency of the drone. Defaults to 200 Hz.
+        control_freq (float, optional): Control frequency of the drone. Defaults to 100 Hz.
     """
 
     def __init__(
@@ -161,7 +159,7 @@ class CBFNode(Node):
         cbf_config: CBFConfig,
         z_des: ArrayLike = (0, 0, -1, 0, 0, 0),
         vel_buffer_depth: int = 5,
-        control_freq: float = 200,
+        control_freq: float = 100,
     ):
         super().__init__(NODE_NAME)
         assert isinstance(cbf_config, CBFConfig)
@@ -210,7 +208,10 @@ class CBFNode(Node):
         # Filter the velocity because we only have an instantaneous position measurement
         current_time = self.get_clock().now().to_msg()
         time_in_seconds = current_time.sec + current_time.nanosec * 1e-9
-        current_position = np.array([msg.position.x, msg.position.y, msg.position.z])
+        # NOTE: Mocap has a different frame convention than the drone
+        # We'll update the obstacle position to match the drone frame
+        # This just involves inverting the y and z coordinates
+        current_position = np.array([msg.position.x, -msg.position.y, -msg.position.z])
         if (
             self.last_obstacle_position is not None
             and self.last_obstacle_time is not None
@@ -234,7 +235,8 @@ class CBFNode(Node):
         msg = TrajectorySetpoint(
             velocity=safe_controller(
                 self.cbf, self.last_z, self.z_des, self.last_z_obs
-            ).__array__()
+            ).__array__(),
+            timestamp=int(self.get_clock().now().nanoseconds / 1000),
         )
         self.setpoint_pub.publish(msg)
 
