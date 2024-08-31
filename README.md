@@ -37,7 +37,7 @@ pip install -e .
 
 Terminal 1 (Computer): Mocap
 ```
-cd drone_fencing_ws/src/Trajbridge/Trajbridge
+cd drone_fencing_ws/src/TrajBridge/TrajBridge
 source install/setup.bash
 ros2 launch px4_comm mocap.launch.py
 ```
@@ -50,7 +50,7 @@ micro-xrce-dds-agent serial --dev /dev/ttyTHS0 -b 921600
 Terminal 3 (Drone): TrajBridge
 ```
 # ssh asl@drone10.local
-cd drone_fencing_ws/src/TrajBridge/TrajBridge
+cd ~/StanfordMSL/TrajBridge/TrajBridge
 source install/setup.bash
 ros2 launch px4_comm trajbridge.launch.py
 ```
@@ -65,3 +65,11 @@ python cbf_controller/cbf_node.py
 
 
 See the [TrajBridge wiki page](https://github.com/StanfordMSL/TrajBridge/wiki) for additional info
+
+
+## Debugging notes
+
+- Had to change the ROS_DOMAIN_ID env var to 123 in the `~/.bashrc` to avoid other people running things from interfering with our code
+- Also, changed the UXRCE_DDS_DOM_ID parameter on the microcontroller (via qgroundcontrol) to the same value
+- Changed the Trajbridge code to match Keiko's older version (with an older version of the px4_comm/p4_msgs packages) -- to fix a bug where the state machine would be subscribing to a message with a different structure than what was actually being published (from a different version of the firmware on the microcontroller + the micro xrce bridge)
+- Added `source /opt/ros/humble/setup.bash` to the `~/.bashrc` files on the drone and laptop
