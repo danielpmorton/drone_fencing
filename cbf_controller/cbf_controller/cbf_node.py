@@ -3,6 +3,15 @@
 Assumes we have a PX4 drone and an obstacle (sword tip) tracked by motion capture.
 """
 
+# TODO: Tune the following
+# - Publishing frequency
+# - QoS depth
+# - Velocity limits
+# - Bounding box limits
+# - Obstacle radius/padding
+# - Nominal controller gains
+# - Obstacle velocity buffer depth
+
 from collections import deque
 from functools import partial
 
@@ -16,7 +25,7 @@ from cbfpy import CBF, CBFConfig
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseStamped
 from px4_msgs.msg import TrajectorySetpoint, VehicleOdometry
 
 jax.config.update("jax_enable_x64", True)
@@ -24,7 +33,7 @@ jax.config.update("jax_enable_x64", True)
 NODE_NAME = "cbf_node"
 VEHICLE_ODOMETRY_TOPIC = "/fmu/out/vehicle_odometry"
 OBSTACLE_MOCAP_TOPIC = "/vrpn_mocap/obstacle/pose"
-VEHICLE_SETPOINT_TOPIC = "/fmu/setpoint_control/velocity_with_ff"
+VEHICLE_SETPOINT_TOPIC = "/setpoint_control/velocity_with_ff"
 
 
 class DroneConfig(CBFConfig):
@@ -37,21 +46,21 @@ class DroneConfig(CBFConfig):
     where u  = [vx, vy, vz]
 
     Args:
-        pos_min (ArrayLike, optional): XYZ Lower bound of the safe-set box. Defaults to (-2, -2, -2)
-        pos_max (ArrayLike, optional): XYZ Upper bound of the safe-set box. Defaults to (2, 2, 2)
+        pos_min (ArrayLike, optional): XYZ Lower bound of the safe-set box. Defaults to (-2, -2, -1.5)
+        pos_max (ArrayLike, optional): XYZ Upper bound of the safe-set box. Defaults to (2, 2, -0.5)
         drone_radius (float, optional): Radius of the drone. Defaults to 0.175.
         obstacle_radius (float, optional): Radius of the obstacle. Defaults to 0.04.
-        padding (float, optional): Padding between the drone and the obstacle. Defaults to 0.15.
+        padding (float, optional): Padding between the drone and the obstacle. Defaults to 0.25.
         lookahead_time (float, optional): Time horizon for obstacle avoidance. Defaults to 2.0.
     """
 
     def __init__(
         self,
-        pos_min: ArrayLike = (-2, -2, -2),
-        pos_max: ArrayLike = (2, 2, 2),
+        pos_min: ArrayLike = (-2, -2, -1.5),
+        pos_max: ArrayLike = (2, 2, -0.5),
         drone_radius: float = 0.175,
         obstacle_radius: float = 0.04,
-        padding: float = 0.15,
+        padding: float = 0.25,
         lookahead_time: float = 2.0,
     ):
         self.mass = 1.0
@@ -167,25 +176,35 @@ class CBFNode(Node):
         self.z_des = jnp.asarray(z_des, dtype=jnp.float64)
         self.control_freq = control_freq
         # QoS profile for the publisher and subscribers
-        qos_profile = QoSProfile(
+        # TODO decide on if the depth should be modified
+        default_qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
+        mocap_qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
         # Publisher: Sends velocity control commands
         self.setpoint_pub = self.create_publisher(
-            TrajectorySetpoint, VEHICLE_SETPOINT_TOPIC, qos_profile
+            TrajectorySetpoint, VEHICLE_SETPOINT_TOPIC, default_qos_profile
         )
         # Subscribers: Listens to state of the drone and the obstacle
         self.vehicle_odometry_sub = self.create_subscription(
             VehicleOdometry,
             VEHICLE_ODOMETRY_TOPIC,
             self.vehicle_odometry_callback,
-            qos_profile,
+            default_qos_profile,
         )
         self.obstacle_mocap_sub = self.create_subscription(
-            Pose, OBSTACLE_MOCAP_TOPIC, self.mocap_callback, qos_profile
+            PoseStamped,
+            OBSTACLE_MOCAP_TOPIC,
+            self.mocap_callback,
+            mocap_qos_profile,
         )
         # Set up cache for last known states of the drone and the obstacle
         # Also, store a buffer for filtering the obstacle velocity
@@ -203,27 +222,30 @@ class CBFNode(Node):
         self.last_z = np.concatenate([msg.position, msg.velocity])
         # self.publish_control()
 
-    def mocap_callback(self, msg: Pose):
+    def mocap_callback(self, msg: PoseStamped):
         """Callback when we have new information on the state of the obstacle"""
         # Filter the velocity because we only have an instantaneous position measurement
-        current_time = self.get_clock().now().to_msg()
-        time_in_seconds = current_time.sec + current_time.nanosec * 1e-9
+        current_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         # NOTE: Mocap has a different frame convention than the drone
         # We'll update the obstacle position to match the drone frame
         # This just involves inverting the y and z coordinates
-        current_position = np.array([msg.position.x, -msg.position.y, -msg.position.z])
+        current_position = np.array(
+            [msg.pose.position.x, -msg.pose.position.y, -msg.pose.position.z]
+        )
         if (
             self.last_obstacle_position is not None
             and self.last_obstacle_time is not None
         ):
-            delta_time = time_in_seconds - self.last_obstacle_time
+            delta_time = current_time - self.last_obstacle_time
             delta_position = current_position - self.last_obstacle_position
             instantaneous_velocity = delta_position / delta_time
             self.velocity_buffer.append(instantaneous_velocity)
+        else:
+            self.velocity_buffer.append(np.zeros(3))
         filtered_velocity = np.mean(self.velocity_buffer, axis=0)
 
         # Update stored parameters
-        self.last_obstacle_time = time_in_seconds
+        self.last_obstacle_time = current_time
         self.last_obstacle_position = current_position
         self.last_z_obs = np.concatenate([current_position, filtered_velocity])
         # self.publish_control()
@@ -234,7 +256,10 @@ class CBFNode(Node):
             return
         msg = TrajectorySetpoint(
             velocity=safe_controller(
-                self.cbf, self.last_z, self.z_des, self.last_z_obs
+                self.cbf,
+                jnp.asarray(self.last_z, dtype=jnp.float64),
+                jnp.asarray(self.z_des, dtype=jnp.float64),
+                jnp.asarray(self.last_z_obs, dtype=jnp.float64),
             ).__array__(),
             timestamp=int(self.get_clock().now().nanoseconds / 1000),
         )
