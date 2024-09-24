@@ -44,8 +44,7 @@ ros2 launch px4_comm mocap.launch.py
 Terminal 2 (Drone): MicroXRCE
 ```
 # ssh asl@drone10.local
-micro-xrce-dds-agent serial --dev /dev/ttyTHS0 -b 921600 
-# Note that ttyTHS0 may need to be replaced by ttyTHS1
+sudo micro-xrce-dds-agent serial --dev /dev/ttyTHS1 -b 921600 
 ```
 Terminal 3 (Drone): TrajBridge
 ```
@@ -73,3 +72,9 @@ See the [TrajBridge wiki page](https://github.com/StanfordMSL/TrajBridge/wiki) f
 - Also, changed the UXRCE_DDS_DOM_ID parameter on the microcontroller (via qgroundcontrol) to the same value
 - Changed the Trajbridge code to match Keiko's older version (with an older version of the px4_comm/p4_msgs packages) -- to fix a bug where the state machine would be subscribing to a message with a different structure than what was actually being published (from a different version of the firmware on the microcontroller + the micro xrce bridge)
 - Added `source /opt/ros/humble/setup.bash` to the `~/.bashrc` files on the drone and laptop
+
+## TODO
+- Update the drone11 px4 UXRCE_DDS_DOM_ID parameter
+- Check to make sure that the bashrc is the same on drone10/11
+- Try changing the waypoint ready in trajbridge **on the drone, not on the laptop**
+- Echo the fmu/in/... rostopic to see if the command signal from trajbridge to drone is correct

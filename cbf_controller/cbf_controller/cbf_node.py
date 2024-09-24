@@ -33,7 +33,9 @@ jax.config.update("jax_enable_x64", True)
 NODE_NAME = "cbf_node"
 VEHICLE_ODOMETRY_TOPIC = "/fmu/out/vehicle_odometry"
 OBSTACLE_MOCAP_TOPIC = "/vrpn_mocap/obstacle/pose"
-VEHICLE_SETPOINT_TOPIC = "/setpoint_control/velocity_with_ff"
+VEHICLE_SETPOINT_TOPIC = "/fmu/setpoint_control/velocity_with_ff"
+# The following topic would bypass Trajbridge and send directly to the drone
+# VEHICLE_SETPOINT_TOPIC = "/fmu/in/trajectory_setpoint/velocity_with_ff"
 
 
 class DroneConfig(CBFConfig):
@@ -255,6 +257,7 @@ class CBFNode(Node):
         if self.last_z is None or self.last_z_obs is None:
             return
         msg = TrajectorySetpoint(
+            position=np.array([np.nan, np.nan, np.nan]),
             velocity=safe_controller(
                 self.cbf,
                 jnp.asarray(self.last_z, dtype=jnp.float64),
