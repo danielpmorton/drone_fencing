@@ -77,4 +77,4 @@ See the [TrajBridge wiki page](https://github.com/StanfordMSL/TrajBridge/wiki) f
 - Update the drone11 px4 UXRCE_DDS_DOM_ID parameter
 - Check to make sure that the bashrc is the same on drone10/11
 - Try changing the waypoint ready in trajbridge **on the drone, not on the laptop**
-- Echo the fmu/in/... rostopic to see if the command signal from trajbridge to drone is correct
+- Echo the fmu/in/... rostopic to see if the command signal from trajbridge to drone is correct. The drone will need to be sitting still near the waypoint ready and then you can activate the cbf control node (without arming the drone)

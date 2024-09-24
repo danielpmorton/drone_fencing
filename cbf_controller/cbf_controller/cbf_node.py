@@ -33,9 +33,14 @@ jax.config.update("jax_enable_x64", True)
 NODE_NAME = "cbf_node"
 VEHICLE_ODOMETRY_TOPIC = "/fmu/out/vehicle_odometry"
 OBSTACLE_MOCAP_TOPIC = "/vrpn_mocap/obstacle/pose"
-VEHICLE_SETPOINT_TOPIC = "/fmu/setpoint_control/velocity_with_ff"
+CONTROL_MODE = "velocity"
+VELOCITY_SETPOINT_TOPIC = "/fmu/setpoint_control/velocity_with_ff"
+POSITION_SETPOINT_TOPIC = "/fmu/setpoint_control/position_with_ff"
+VEHICLE_SETPOINT_TOPIC = (
+    VELOCITY_SETPOINT_TOPIC if CONTROL_MODE == "velocity" else POSITION_SETPOINT_TOPIC
+)
 # The following topic would bypass Trajbridge and send directly to the drone
-# VEHICLE_SETPOINT_TOPIC = "/fmu/in/trajectory_setpoint/velocity_with_ff"
+# VEHICLE_VEL_SETPOINT_TOPIC = "/fmu/in/trajectory_setpoint/velocity_with_ff"
 
 
 class DroneConfig(CBFConfig):
@@ -61,7 +66,7 @@ class DroneConfig(CBFConfig):
         pos_min: ArrayLike = (-2, -2, -1.5),
         pos_max: ArrayLike = (2, 2, -0.5),
         drone_radius: float = 0.175,
-        obstacle_radius: float = 0.04,
+        obstacle_radius: float = 0.04,  # Bump this up? + reduce padding?
         padding: float = 0.25,
         lookahead_time: float = 2.0,
     ):
@@ -211,6 +216,7 @@ class CBFNode(Node):
         # Set up cache for last known states of the drone and the obstacle
         # Also, store a buffer for filtering the obstacle velocity
         self.last_z = None
+        # self.last_z_time = None
         self.velocity_buffer = deque(maxlen=vel_buffer_depth)
         self.last_obstacle_time = None
         self.last_obstacle_position = None
@@ -219,9 +225,14 @@ class CBFNode(Node):
         # Publish the control input at the desired frequency
         self.timer = self.create_timer(1 / self.control_freq, self.publish_control)
 
+        # HACK
+        self.pos_min = cbf_config.pos_min.__array__()
+        self.pos_max = cbf_config.pos_max.__array__()
+
     def vehicle_odometry_callback(self, msg: VehicleOdometry):
         """Callback when we have new information on the state of the drone"""
         self.last_z = np.concatenate([msg.position, msg.velocity])
+        # self.last_z_time = msg.timestamp / 1e6
         # self.publish_control()
 
     def mocap_callback(self, msg: PoseStamped):
@@ -256,14 +267,35 @@ class CBFNode(Node):
         """Publish the CBF safe velocity control input to the drone"""
         if self.last_z is None or self.last_z_obs is None:
             return
+        velocity = safe_controller(
+            self.cbf,
+            jnp.asarray(self.last_z, dtype=jnp.float64),
+            jnp.asarray(self.z_des, dtype=jnp.float64),
+            jnp.asarray(self.last_z_obs, dtype=jnp.float64),
+        ).__array__()
+        if CONTROL_MODE == "velocity":
+            position == np.array([np.nan, np.nan, np.nan])
+        else:  # Position mode
+            dt = 1 / self.control_freq
+            # TODO check if the loic here makes sense...
+            # Estimate the current position based on the last position/velocity info,
+            # then propagate the position by the velocity control
+            position = dt * velocity + self.last_z[:3] + self.last_z[3:] * dt
+
+            # HACK: additional safety filter that shouldn't be needed if cbf is working
+            position = np.clip(position, self.pos_min, self.pos_max)
+            tol = 1e-2
+            # If we are at the upper limit in any direction, ensure that we only move away from the limit (downwards)
+            velocity = np.where(
+                self.pos_max - position > tol, velocity, np.minimum(velocity, 0)
+            )
+            # If we are at the lower limit in any direction, ensure that we only move away from the limit (upwards)
+            velocity = np.where(
+                position - self.pos_min > tol, velocity, np.maximum(velocity, 0)
+            )
         msg = TrajectorySetpoint(
-            position=np.array([np.nan, np.nan, np.nan]),
-            velocity=safe_controller(
-                self.cbf,
-                jnp.asarray(self.last_z, dtype=jnp.float64),
-                jnp.asarray(self.z_des, dtype=jnp.float64),
-                jnp.asarray(self.last_z_obs, dtype=jnp.float64),
-            ).__array__(),
+            position=position,
+            velocity=velocity,
             timestamp=int(self.get_clock().now().nanoseconds / 1000),
         )
         self.setpoint_pub.publish(msg)
