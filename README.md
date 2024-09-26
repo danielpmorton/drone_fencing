@@ -78,3 +78,24 @@ See the [TrajBridge wiki page](https://github.com/StanfordMSL/TrajBridge/wiki) f
 - Check to make sure that the bashrc is the same on drone10/11
 - Try changing the waypoint ready in trajbridge **on the drone, not on the laptop**
 - Echo the fmu/in/... rostopic to see if the command signal from trajbridge to drone is correct. The drone will need to be sitting still near the waypoint ready and then you can activate the cbf control node (without arming the drone)
+
+
+## Notes on local network in dance studio
+
+TODO
+- Get the router set up in a high area away from anything metal. Command strips/hooks?
+
+Config/params
+- Wifi: TP-Link_BDE8
+- Hostname for MSL laptop: mslxps2 
+- Hostname for mocap computer: SRC-campc-030
+- Hostname for drone: drone10 or drone11
+- IP address for drone10: 192.168.0.238
+
+Notes
+- Remember to enable cameras and flip the "VRPN Enable" switch in settings
+- Getting the mocap to work just required creating a new mocap launch file with the SRC optitrack IP address in the server line
+- There was some noticeable lag at 120Hz -- 360 seems better. Note that if you go too high on frequency then you lose camera frame size, so 360 seems to strike a good balance between image size and responsiveness
+- Optitrack defaults to y up, but the flight room uses z up. I switched it to z-up in the streaming settings
+- Connecting the laptop to the LAN via ethernet is ideal to minimize any communication lags
+- SSH into drone 10 as `ssh asl@192.168.0.238`
