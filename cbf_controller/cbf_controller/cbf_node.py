@@ -30,12 +30,19 @@ from px4_msgs.msg import TrajectorySetpoint, VehicleOdometry
 
 jax.config.update("jax_enable_x64", True)
 
+V_MAX = 2.0
+CLAMP_VELOCITY = True
 NODE_NAME = "cbf_node"
 VEHICLE_ODOMETRY_TOPIC = "/fmu/out/vehicle_odometry"
 OBSTACLE_MOCAP_TOPIC = "/vrpn_mocap/obstacle/pose"
 CONTROL_MODE = "velocity"
-VELOCITY_SETPOINT_TOPIC = "/fmu/setpoint_control/velocity_with_ff"
-POSITION_SETPOINT_TOPIC = "/fmu/setpoint_control/position_with_ff"
+# VELOCITY_SETPOINT_TOPIC = "/fmu/setpoint_control/velocity_with_ff"
+VELOCITY_SETPOINT_TOPIC = "/setpoint_control/velocity_with_ff"
+# VELOCITY_SETPOINT_TOPIC = "/fmu/in/trajectory_setpoint/velocity_with_ff"
+
+# POSITION_SETPOINT_TOPIC = "/fmu/setpoint_control/position_with_ff"
+POSITION_SETPOINT_TOPIC = "/setpoint_control/position_with_ff"
+# POSITION_SETPOINT_TOPIC = "/fmu/in/trajectory_setpoint/position_with_ff"
 VEHICLE_SETPOINT_TOPIC = (
     VELOCITY_SETPOINT_TOPIC if CONTROL_MODE == "velocity" else POSITION_SETPOINT_TOPIC
 )
@@ -61,12 +68,16 @@ class DroneConfig(CBFConfig):
         lookahead_time (float, optional): Time horizon for obstacle avoidance. Defaults to 2.0.
     """
 
+    # SRC room box is (4.5m, 3m, 2.3m)
+    # We'll also tighten this constraint for the CBF
+    # Remember that  is negative up for drone coordinates
+
     def __init__(
         self,
-        pos_min: ArrayLike = (-2, -2, -1.5),
-        pos_max: ArrayLike = (2, 2, -0.5),
+        pos_min: ArrayLike = (-2.0, -1.25, -2.0),  # (-2.25, -1.5, -2.3),
+        pos_max: ArrayLike = (2.0, 1.25, -0.5),  # (2.25, 1.5, -0.5),
         drone_radius: float = 0.175,
-        obstacle_radius: float = 0.04,  # Bump this up? + reduce padding?
+        obstacle_radius: float = 0.15,  # Bump this up? + reduce padding?
         padding: float = 0.25,
         lookahead_time: float = 2.0,
     ):
@@ -83,6 +94,8 @@ class DroneConfig(CBFConfig):
             m=3,
             num_barr=7,
             relative_degree=1,
+            u_min=jnp.array([-3.0, -3.0, -3.0]),
+            u_max=jnp.array([3.0, 3.0, 3.0]),
             relax_cbf=True,
             init_args=(init_z_obs,),
             cbf_relaxation_penalty=1e6,
@@ -273,8 +286,17 @@ class CBFNode(Node):
             jnp.asarray(self.z_des, dtype=jnp.float64),
             jnp.asarray(self.last_z_obs, dtype=jnp.float64),
         ).__array__()
+
+        if CLAMP_VELOCITY:
+            # TODO decide if this l1 clipping is fine...
+            # velocity = np.clip(velocity, -V_MAX, V_MAX)
+            # Or use the magnitude
+            v_mag = np.linalg.norm(velocity)
+            v_unit = np.divide(velocity, v_mag)
+            v_mag = np.clip(v_mag, 0, V_MAX)
+            velocity = v_unit * v_mag
         if CONTROL_MODE == "velocity":
-            position == np.array([np.nan, np.nan, np.nan])
+            position = np.array([np.nan, np.nan, np.nan])
         else:  # Position mode
             dt = 1 / self.control_freq
             # TODO check if the loic here makes sense...
