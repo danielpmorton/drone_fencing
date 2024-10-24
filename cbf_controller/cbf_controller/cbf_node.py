@@ -68,14 +68,14 @@ class DroneConfig(CBFConfig):
         lookahead_time (float, optional): Time horizon for obstacle avoidance. Defaults to 2.0.
     """
 
-    # SRC room box is (4.5m, 3m, 2.3m)
+    # SRC field robotics room safety box is (5m, 4m, 2.3m)
     # We'll also tighten this constraint for the CBF
-    # Remember that  is negative up for drone coordinates
+    # Remember that it is negative up for drone z coordinates
 
     def __init__(
         self,
-        pos_min: ArrayLike = (-2.0, -1.25, -2.0),  # (-2.25, -1.5, -2.3),
-        pos_max: ArrayLike = (2.0, 1.25, -0.5),  # (2.25, 1.5, -0.5),
+        pos_min: ArrayLike = (-2.25, -1.75, -2.0),  # (-2.25, -1.5, -2.3),
+        pos_max: ArrayLike = (2.25, 1.75, -0.5),  # (2.25, 1.5, -0.5),
         drone_radius: float = 0.175,
         obstacle_radius: float = 0.15,  # Bump this up? + reduce padding?
         padding: float = 0.25,
