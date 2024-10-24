@@ -12,11 +12,11 @@ def generate_launch_description():
                 namespace="vrpn_mocap",
                 output="screen",
                 emulate_tty=True,
-                parameters=[{"server": "192.168.0.119", "port": 3883}],
+                parameters=[{"server": "192.168.0.224", "port": 3883}],
             ),
             Node(
                 package="px4_comm",
-                executable="mocap_node.py",
+                executable="src_mocap_node.py",
                 name="mocap_0",
                 output="screen",
                 emulate_tty=True,
