@@ -48,6 +48,7 @@ install(DIRECTORY
 install(PROGRAMS
   scripts/state_machine_node.py
   scripts/mocap_node.py
+  scripts/src_mocap_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 ament_package()
