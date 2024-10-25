@@ -255,8 +255,10 @@ class CBFNode(Node):
         # NOTE: Mocap has a different frame convention than the drone
         # We'll update the obstacle position to match the drone frame
         # This just involves inverting the y and z coordinates
+        # NOTE NEW!! Field bay has y up. X is the same, though !!!!!!!!!!!!!!!!!!!!
+        # Flight room was (x, -y, -z)        
         current_position = np.array(
-            [msg.pose.position.x, -msg.pose.position.y, -msg.pose.position.z]
+            [msg.pose.position.x, msg.pose.position.z, -msg.pose.position.y]
         )
         if (
             self.last_obstacle_position is not None
