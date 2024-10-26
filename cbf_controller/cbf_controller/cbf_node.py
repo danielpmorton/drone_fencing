@@ -30,8 +30,8 @@ from px4_msgs.msg import TrajectorySetpoint, VehicleOdometry
 
 jax.config.update("jax_enable_x64", True)
 
-V_MAX = 2.0
-CLAMP_VELOCITY = True
+V_MAX = 4.0
+CLAMP_VELOCITY = False
 NODE_NAME = "cbf_node"
 VEHICLE_ODOMETRY_TOPIC = "/fmu/out/vehicle_odometry"
 OBSTACLE_MOCAP_TOPIC = "/vrpn_mocap/obstacle/pose"
@@ -94,8 +94,8 @@ class DroneConfig(CBFConfig):
             m=3,
             num_barr=7,
             relative_degree=1,
-            u_min=jnp.array([-3.0, -3.0, -3.0]),
-            u_max=jnp.array([3.0, 3.0, 3.0]),
+            u_min=jnp.array([-8.0, -8.0, -4.0]),
+            u_max=jnp.array([8.0, 8.0, 4.0]),
             relax_cbf=True,
             init_args=(init_z_obs,),
             cbf_relaxation_penalty=1e6,
@@ -186,7 +186,7 @@ class CBFNode(Node):
     def __init__(
         self,
         cbf_config: CBFConfig,
-        z_des: ArrayLike = (0, 0, -1, 0, 0, 0),
+        z_des: ArrayLike = (0, 0, -1.25, 0, 0, 0),
         vel_buffer_depth: int = 5,
         control_freq: float = 100,
     ):
