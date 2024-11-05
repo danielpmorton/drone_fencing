@@ -75,8 +75,6 @@ cd ../cbf_controller
 python cbf_controller/cbf_node.py
 ```
 
-See the [TrajBridge wiki page](https://github.com/StanfordMSL/TrajBridge/wiki) for additional info
-
 ## SRC vs Flightroom notes
 
 Optitrack in the flightroom has Z-up, but in SRC, it was set to Y-up. To account for this, this required adjusting:
@@ -97,3 +95,8 @@ Some other things that needed adjusting were:
 - If the EKF estimate on the drone is randomly flipping signs, the firmware is probably bad.
 - If the TrajBridge state machine is not transitioning states, there might be a version mismatch between the px4_msgs between the companion computer, ground station, and px4
 - If you get a message about QoS incompatibility, check how this was done in the cbf_node file. The mocap uses a QoS which is different than the default
+
+## Additional resources
+
+- [TrajBridge wiki page](https://github.com/StanfordMSL/TrajBridge/wiki)
+- [MSL Quad Build Guide](https://docs.google.com/presentation/d/1GplwG5dU9iBMCfxJVyR89wg4f9wwwXytaCo_LqSN5lc/edit?usp=sharing)
