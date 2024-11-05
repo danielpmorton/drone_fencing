@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Drone Fencing with Control Barrier Functions">
+  <meta name="keywords" content="Drone, Quadrotor, CBF, Optimal Control, Robotics, Fencing">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drone Fencing with Control Barrier Functions</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/favicon.svg">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+</head>
+
+<body>
+
+  <!-- TODO: Add additional header links in the future -->
+  <!-- See Nerfies site as an example -->
+
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">Drone Fencing with Control Barrier Functions</h1>
+            <div class="is-size-5 publication-authors">
+
+              <span>A demo for the <a href="https://src.stanford.edu/">Stanford Robotics Center</a> opening</span>
+              <br>
+              <span>November 2024</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="hero teaser">
+    <div class="container is-max-desktop">
+      <div class="hero-body">
+        <img src="./static/images/drone_fencing.jpg" alt=""
+          style="display: block; margin-left: auto; margin-right: auto" />
+        <h2 class="subtitle has-text-centered">
+          Demonstrating dynamic collision avoidance with control barrier functions (CBFs).
+        </h2>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <!-- Overview. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Overview</h2>
+          <div class="content has-text-justified">
+
+            <!-- <video id="teaser" autoplay muted loop playsinline height="100%">
+              <source src="./static/videos/me.mp4" type="video/mp4">
+            </video> -->
+            <div class="publication-video">
+
+              <video id="teaser" autoplay muted loop playsinline height="100%">
+                <source src="./static/videos/me.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
+            </div>
+            <br>
+            <p>
+              The controller for this drone consists of a nominal (unsafe) controller, with a higher-level CBF safety
+              filter ensuring that the command sent to the drone adheres to our safety conditions
+              (barrier functions). Here, our nominal controller is a simple PD controller, commanding a velocity to keep
+              the drone at a hover in the center of the room. The CBF takes in this velocity command, as well as the
+              current state of the drone and the saber, and determines the optimal control input to meet our safety
+              criteria:
+            <ul>
+              <li>Remain within a safe set (a box, centered in the flight area)</li>
+              <li>Avoid a collision with the tip of the saber</li>
+            </ul>
+            while also minimizing the change to the nominal control.
+            </p>
+
+            <p>
+              For simplicity, we model the system as a point robot with direct control over the velocity (our control
+              input). This assumption relies on the low-level PX4 velocity controller being able to track the reference
+              velocity command at a reasonably fast rate. The flight controller takes this velocity command, converts
+              it into an acceleration setpoint, which further is converted to thrust and attitude setpoints, and then
+              eventually motor commands.
+            </p>
+
+            <p>
+              Solving the CBF is <em>fast</em>. For this demo, we ran our controller at 100 Hz, mainly due to our
+              OptiTrack localization being limited to 120Hz. However, we could have upped this to extreme speeds: our
+              CBF (QP matrix construction and solve) on average only took 0.3 ms to compute per iteration.
+            </p>
+
+
+          </div>
+        </div>
+      </div>
+      <!--/ Overview. -->
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <!-- <h2 class="title is-3 has-text-centered">Additional Demos</h2> -->
+      <div class="columns is-centered">
+        <div class="column is-half">
+          <div class="publication-video">
+            <video controls autoplay muted loop>
+              <source src="./static/videos/mj.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </div>
+        <div class="column is-half">
+          <div class="publication-video">
+            <video controls autoplay muted loop>
+              <source src="./static/videos/marco.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </div>
+      </div>
+      <!-- <p>Students and professors alike were able to participate in the demo</p> -->
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">3D Reconstruction</h2>
+      <!-- Add some lorem ipsum text here -->
+      <p>As a part of the SRC launch, the <a href="https://navlab.stanford.edu/">NAV Lab</a> constructed a digital twin
+        of each demo being presented. Below is the 3D Gaussian Splat, which was trained on a series of images captured
+        around the
+        demo space.</p>
+      <br>
+      <iframe src="https://poly.cam/capture/6A83267D-CD6F-43B0-8DB9-3A7A16122585/embed" title="polycam capture viewer"
+        style="height:100%;width:100%;max-height:720px;max-width:1280px;min-height:280px;min-width:280px"
+        frameborder="0">
+      </iframe>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container has-text-centered">
+      <img src="./static/images/SRClogo.png" alt="SRC Logo" style="max-width: 200px; margin-bottom: 10px;" />
+      <p>
+        Website template borrowed from <a href="https://nerfies.github.io/">Nerfies</a>
+      </p>
+    </div>
+  </footer>
+
+</body>
+
+</html>
