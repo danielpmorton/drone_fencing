@@ -154,16 +154,19 @@
             <p class="mathjax-equation">
               \[
               h = \begin{bmatrix}
-              \vec{x}_{\text{drone}} - \vec{x}_{\text{min}} \\
-              \vec{x}_{\text{max}} - \vec{x}_{\text{drone}} \\
-              \|\vec{x}_{\text{drone}} - \vec{x}_{\text{obs}}\|_{2} - \Delta T (\vec{v}_{\text{obs}} -
-              \vec{v}_{\text{drone}})^{T}(\vec{x}_{\text{drone}} -
-              \vec{x}_{\text{obs}})(\|\vec{x}_{\text{drone}} - \vec{x}_{\text{obs}}\|_{2})^{-1} - r_{\text{obs}} -
-              r_{\text{drone}}
+              \vec{x}_{\text{d}} - \vec{x}_{\text{min}} \\
+              \vec{x}_{\text{max}} - \vec{x}_{\text{d}} \\
+              \|\vec{x}_{\text{d}} - \vec{x}_{\text{o}}\|_{2} - \Delta T (\vec{v}_{\text{o}} -
+              \vec{v}_{\text{d}})^{T}(\vec{x}_{\text{d}} -
+              \vec{x}_{\text{o}})(\|\vec{x}_{\text{d}} - \vec{x}_{\text{o}}\|_{2})^{-1} - r_{\text{o}} -
+              r_{\text{d}}
               \end{bmatrix}
               \]
             </p>
-            <br>
+            <p>
+              Here, the subscripts \( \text{d} \) and \( \text{o} \) denote values for the drone and the obstacle,
+              respectively. \( r \) indicates a radius, and \( \Delta T \) is a time constant.
+            </p>
             <p>
               Solving this CBF is <em>fast</em>. For this demo, we ran our controller at 100 Hz, mainly due to our
               OptiTrack localization being limited to 120Hz. However, we could have upped this to extreme speeds: our
