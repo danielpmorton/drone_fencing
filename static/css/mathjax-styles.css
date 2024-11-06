@@ -1,0 +1,28 @@
+.mathjax-equation {
+    font-size: 1em;
+    /* Default font size */
+}
+
+@media (max-width: 1200px) {
+    .mathjax-equation {
+        font-size: 0.9em;
+    }
+}
+
+@media (max-width: 992px) {
+    .mathjax-equation {
+        font-size: 0.8em;
+    }
+}
+
+@media (max-width: 768px) {
+    .mathjax-equation {
+        font-size: 0.7em;
+    }
+}
+
+@media (max-width: 576px) {
+    .mathjax-equation {
+        font-size: 0.6em;
+    }
+}
