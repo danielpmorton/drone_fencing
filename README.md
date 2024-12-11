@@ -2,6 +2,8 @@
 
 A demo for the Stanford Robotics Center opening, November 2024
 
+The main ROS2 node is in `cbf_controller/cbf_node.py`. This is a good example of using CBFpy with ROS. However, note that this demo was written for an older version of CBFpy, so there are some very minor API differences.
+
 ## Installation
 
 ```

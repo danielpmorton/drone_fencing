@@ -13,7 +13,6 @@ Assumes we have a PX4 drone and an obstacle (sword tip) tracked by motion captur
 # - Obstacle velocity buffer depth
 
 from collections import deque
-from functools import partial
 
 import numpy as np
 import jax.numpy as jnp
@@ -30,24 +29,10 @@ from px4_msgs.msg import TrajectorySetpoint, VehicleOdometry
 
 jax.config.update("jax_enable_x64", True)
 
-V_MAX = 4.0
-CLAMP_VELOCITY = False
 NODE_NAME = "cbf_node"
 VEHICLE_ODOMETRY_TOPIC = "/fmu/out/vehicle_odometry"
 OBSTACLE_MOCAP_TOPIC = "/vrpn_mocap/obstacle/pose"
-CONTROL_MODE = "velocity"
-# VELOCITY_SETPOINT_TOPIC = "/fmu/setpoint_control/velocity_with_ff"
 VELOCITY_SETPOINT_TOPIC = "/setpoint_control/velocity_with_ff"
-# VELOCITY_SETPOINT_TOPIC = "/fmu/in/trajectory_setpoint/velocity_with_ff"
-
-# POSITION_SETPOINT_TOPIC = "/fmu/setpoint_control/position_with_ff"
-POSITION_SETPOINT_TOPIC = "/setpoint_control/position_with_ff"
-# POSITION_SETPOINT_TOPIC = "/fmu/in/trajectory_setpoint/position_with_ff"
-VEHICLE_SETPOINT_TOPIC = (
-    VELOCITY_SETPOINT_TOPIC if CONTROL_MODE == "velocity" else POSITION_SETPOINT_TOPIC
-)
-# The following topic would bypass Trajbridge and send directly to the drone
-# VEHICLE_VEL_SETPOINT_TOPIC = "/fmu/in/trajectory_setpoint/velocity_with_ff"
 
 
 class DroneConfig(CBFConfig):
@@ -92,6 +77,7 @@ class DroneConfig(CBFConfig):
         super().__init__(
             n=6,
             m=3,
+            # NOTE: This code was written for an older version of cbfpy. num_barr and relative_degree are no longer used
             num_barr=7,
             relative_degree=1,
             u_min=jnp.array([-8.0, -8.0, -4.0]),
@@ -109,6 +95,7 @@ class DroneConfig(CBFConfig):
         # Assume we are directly controlling the robot's velocity
         return jnp.block([[jnp.eye(3)], [jnp.zeros((3, 3))]])
 
+    # NOTE: This code was written for an older version of cbfpy. h should be replaced with h_1
     def h(self, z, z_obs):
         pos_robot = z[:3]
         vel_robot = z[3:]
@@ -211,7 +198,7 @@ class CBFNode(Node):
         )
         # Publisher: Sends velocity control commands
         self.setpoint_pub = self.create_publisher(
-            TrajectorySetpoint, VEHICLE_SETPOINT_TOPIC, default_qos_profile
+            TrajectorySetpoint, VELOCITY_SETPOINT_TOPIC, default_qos_profile
         )
         # Subscribers: Listens to state of the drone and the obstacle
         self.vehicle_odometry_sub = self.create_subscription(
@@ -238,10 +225,6 @@ class CBFNode(Node):
         # Publish the control input at the desired frequency
         self.timer = self.create_timer(1 / self.control_freq, self.publish_control)
 
-        # HACK
-        self.pos_min = cbf_config.pos_min.__array__()
-        self.pos_max = cbf_config.pos_max.__array__()
-
     def vehicle_odometry_callback(self, msg: VehicleOdometry):
         """Callback when we have new information on the state of the drone"""
         self.last_z = np.concatenate([msg.position, msg.velocity])
@@ -256,7 +239,7 @@ class CBFNode(Node):
         # We'll update the obstacle position to match the drone frame
         # This just involves inverting the y and z coordinates
         # NOTE NEW!! Field bay has y up. X is the same, though !!!!!!!!!!!!!!!!!!!!
-        # Flight room was (x, -y, -z)        
+        # Flight room was (x, -y, -z)
         current_position = np.array(
             [msg.pose.position.x, msg.pose.position.z, -msg.pose.position.y]
         )
@@ -288,35 +271,7 @@ class CBFNode(Node):
             jnp.asarray(self.z_des, dtype=jnp.float64),
             jnp.asarray(self.last_z_obs, dtype=jnp.float64),
         ).__array__()
-
-        if CLAMP_VELOCITY:
-            # TODO decide if this l1 clipping is fine...
-            # velocity = np.clip(velocity, -V_MAX, V_MAX)
-            # Or use the magnitude
-            v_mag = np.linalg.norm(velocity)
-            v_unit = np.divide(velocity, v_mag)
-            v_mag = np.clip(v_mag, 0, V_MAX)
-            velocity = v_unit * v_mag
-        if CONTROL_MODE == "velocity":
-            position = np.array([np.nan, np.nan, np.nan])
-        else:  # Position mode
-            dt = 1 / self.control_freq
-            # TODO check if the loic here makes sense...
-            # Estimate the current position based on the last position/velocity info,
-            # then propagate the position by the velocity control
-            position = dt * velocity + self.last_z[:3] + self.last_z[3:] * dt
-
-            # HACK: additional safety filter that shouldn't be needed if cbf is working
-            position = np.clip(position, self.pos_min, self.pos_max)
-            tol = 1e-2
-            # If we are at the upper limit in any direction, ensure that we only move away from the limit (downwards)
-            velocity = np.where(
-                self.pos_max - position > tol, velocity, np.minimum(velocity, 0)
-            )
-            # If we are at the lower limit in any direction, ensure that we only move away from the limit (upwards)
-            velocity = np.where(
-                position - self.pos_min > tol, velocity, np.maximum(velocity, 0)
-            )
+        position = np.array([np.nan, np.nan, np.nan])
         msg = TrajectorySetpoint(
             position=position,
             velocity=velocity,
